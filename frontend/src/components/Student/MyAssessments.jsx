@@ -1,28 +1,29 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import toast from 'react-hot-toast';
 import Navbar from '../Navbar';
 
 const MyAssessments = () => {
+  const navigate = useNavigate();
   const user = JSON.parse(localStorage.getItem('user'));
-  const [tasks, setTasks] = useState([]);
+  const [assignments, setAssignments] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetchTasks();
+    fetchAssignments();
   }, []);
 
-  const fetchTasks = async () => {
+  const fetchAssignments = async () => {
     try {
       const token = localStorage.getItem('token');
-      const response = await axios.get('http://localhost:5000/api/tasks/my-tasks', {
+      const response = await axios.get('http://localhost:5000/api/task-assignments/my-assignments', {
         headers: { Authorization: `Bearer ${token}` }
       });
-      setTasks(response.data);
+      setAssignments(response.data);
     } catch (error) {
-      toast.error('Failed to fetch tasks');
+      toast.error('Failed to fetch assignments');
       console.error(error);
-      
     } finally {
       setLoading(false);
     }
@@ -34,11 +35,31 @@ const MyAssessments = () => {
     const now = new Date();
     const diff = deadlineDate - now;
 
-    if (diff <= 0) return 'Expired';
+    if (diff <= 0) return { text: 'Expired', color: 'text-red-600' };
 
     const hours = Math.floor(diff / (1000 * 60 * 60));
     const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-    return `${hours}h ${minutes}m`;
+    
+    if (hours < 3) {
+      return { text: `${hours}h ${minutes}m`, color: 'text-red-600' };
+    } else if (hours < 12) {
+      return { text: `${hours}h ${minutes}m`, color: 'text-yellow-600' };
+    }
+    return { text: `${hours}h ${minutes}m`, color: 'text-green-600' };
+  };
+
+  const handleStartAssessment = (assignmentId) => {
+    navigate(`/student/assessment/${assignmentId}`);
+  };
+
+  const getStatusColor = (status) => {
+    const colors = {
+      'Pending': 'bg-yellow-100 text-yellow-800',
+      'In Progress': 'bg-blue-100 text-blue-800',
+      'Submitted': 'bg-green-100 text-green-800',
+      'Reviewed': 'bg-purple-100 text-purple-800'
+    };
+    return colors[status] || 'bg-gray-100 text-gray-800';
   };
 
   return (
@@ -51,7 +72,7 @@ const MyAssessments = () => {
 
           {loading ? (
             <div className="text-center text-gray-500 py-8">Loading assessments...</div>
-          ) : tasks.length === 0 ? (
+          ) : assignments.length === 0 ? (
             <div className="text-center py-12">
               <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6 inline-block">
                 <svg className="w-12 h-12 text-yellow-500 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -63,69 +84,85 @@ const MyAssessments = () => {
             </div>
           ) : (
             <div className="space-y-6">
-              {tasks.map((task, index) => (
-                <div key={task._id} className="border border-gray-200 rounded-lg p-6 hover:shadow-md transition">
-                  <div className="flex justify-between items-start mb-4">
-                    <div>
-                      <h2 className="text-xl font-semibold text-gray-900 mb-2">
-                        Assessment Task {index + 1}
-                      </h2>
-                      <p className="text-gray-600 mb-1">
-                        <span className="font-medium">Position:</span> {task.applicationId?.position}
-                      </p>
-                      <p className="text-gray-600">
-                        <span className="font-medium">Task Number:</span> {task.taskNumber}
-                      </p>
-                    </div>
-                    <div className="bg-yellow-100 text-yellow-800 px-4 py-2 rounded-lg">
-                      <div className="text-sm font-medium">Time Remaining</div>
-                      <div className="text-lg font-bold">
-                        {calculateTimeRemaining(task.assignedAt, task.deadline)}
+              {assignments.map((assignment, index) => {
+                const timeRemaining = calculateTimeRemaining(assignment.assignedAt, assignment.deadline);
+                const canStart = assignment.status !== 'Submitted' && assignment.status !== 'Reviewed';
+                
+                return (
+                  <div key={assignment._id} className="border border-gray-200 rounded-lg p-6 hover:shadow-md transition bg-white">
+                    <div className="flex justify-between items-start mb-4">
+                      <div className="flex-1">
+                        <h2 className="text-xl font-semibold text-gray-900 mb-2">
+                          Assessment Task {index + 1}
+                        </h2>
+                        <div className="space-y-1 text-gray-600">
+                          <p>
+                            <span className="font-medium">Position:</span> {assignment.applicationId?.position}
+                          </p>
+                          <p>
+                            <span className="font-medium">Task Number:</span> 
+                            <span className="ml-2 px-2 py-1 bg-blue-100 text-blue-800 rounded text-sm font-medium">
+                              {assignment.taskNumber}
+                            </span>
+                          </p>
+                          <p>
+                            <span className="font-medium">Title:</span> {assignment.taskTemplateId?.title}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="bg-yellow-100 text-yellow-800 px-4 py-2 rounded-lg text-center">
+                        <div className="text-sm font-medium">Time Remaining</div>
+                        <div className={`text-lg font-bold ${timeRemaining.color}`}>
+                          {timeRemaining.text}
+                        </div>
                       </div>
                     </div>
-                  </div>
 
-                  <div className="bg-gray-50 rounded-lg p-4 mb-4">
-                    <h3 className="font-semibold text-gray-900 mb-2">{task.title}</h3>
-                    {task.description && (
-                      <p className="text-gray-700 mb-3">{task.description}</p>
-                    )}
-                    {task.instructions && (
-                      <div>
-                        <p className="font-medium text-gray-900 mb-1">Instructions:</p>
-                        <p className="text-gray-700 whitespace-pre-wrap">{task.instructions}</p>
+                    {assignment.taskTemplateId?.description && (
+                      <div className="bg-gray-50 rounded-lg p-4 mb-4">
+                        <p className="text-gray-700">{assignment.taskTemplateId.description}</p>
                       </div>
                     )}
-                  </div>
 
-                  {task.resourceUrl && (
-                    <div className="mb-4">
-                      <a
-                        href={task.resourceUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-blue-600 hover:text-blue-800 font-medium"
-                      >
-                        📎 View Resources
-                      </a>
+                    {assignment.taskTemplateId?.instructions && (
+                      <div className="bg-blue-50 border-l-4 border-blue-500 p-4 mb-4">
+                        <p className="font-medium text-blue-900 mb-1">Instructions:</p>
+                        <p className="text-blue-800 whitespace-pre-wrap">{assignment.taskTemplateId.instructions}</p>
+                      </div>
+                    )}
+
+                    <div className="flex justify-between items-center mt-4">
+                      <div className="flex items-center gap-4">
+                        <span className={`px-4 py-2 rounded-lg font-medium ${getStatusColor(assignment.status)}`}>
+                          {assignment.status}
+                        </span>
+                        <span className="text-gray-600">
+                          {assignment.taskTemplateId?.questions?.length || 0} Questions
+                        </span>
+                        <span className="text-gray-600">
+                          {assignment.taskTemplateId?.totalPoints || 0} Points
+                        </span>
+                      </div>
+                      
+                      {canStart ? (
+                        <button
+                          onClick={() => handleStartAssessment(assignment._id)}
+                          className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-3 rounded-lg transition"
+                        >
+                          {assignment.status === 'In Progress' ? 'Continue Assessment' : 'Start Assessment'}
+                        </button>
+                      ) : (
+                        <div className="text-green-600 font-semibold flex items-center gap-2">
+                          <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                          </svg>
+                          Submitted
+                        </div>
+                      )}
                     </div>
-                  )}
-
-                  <div className="flex gap-3">
-                    <button className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-lg transition">
-                      Start Assessment
-                    </button>
-                    <span className={`px-4 py-3 rounded-lg font-medium ${
-                      task.status === 'Pending' ? 'bg-yellow-100 text-yellow-800' :
-                      task.status === 'In Progress' ? 'bg-blue-100 text-blue-800' :
-                      task.status === 'Submitted' ? 'bg-green-100 text-green-800' :
-                      'bg-gray-100 text-gray-800'
-                    }`}>
-                      {task.status}
-                    </span>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>

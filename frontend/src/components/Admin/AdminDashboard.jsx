@@ -7,8 +7,10 @@ import Navbar from '../Navbar';
 const AdminDashboard = () => {
   const navigate = useNavigate();
   const user = JSON.parse(localStorage.getItem('user'));
+  
   const [stats, setStats] = useState({ total: 0, completed: 0, inProgress: 0 });
   const [applications, setApplications] = useState([]);
+  const [taskTemplates, setTaskTemplates] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -18,27 +20,46 @@ const AdminDashboard = () => {
   const fetchData = async () => {
     try {
       const token = localStorage.getItem('token');
-      const [statsRes, appsRes] = await Promise.all([
+      const [statsRes, appsRes, templatesRes] = await Promise.all([
         axios.get('http://localhost:5000/api/applications/stats', {
           headers: { Authorization: `Bearer ${token}` }
         }),
         axios.get('http://localhost:5000/api/applications/all', {
+          headers: { Authorization: `Bearer ${token}` }
+        }),
+        axios.get('http://localhost:5000/api/task-templates/all', {
           headers: { Authorization: `Bearer ${token}` }
         })
       ]);
 
       setStats(statsRes.data);
       setApplications(appsRes.data);
+      setTaskTemplates(templatesRes.data);
     } catch (error) {
+      console.log(error)
       toast.error('Failed to fetch data');
-      console.error(error);
     } finally {
       setLoading(false);
     }
   };
 
+  const handleDeleteTemplate = async (id) => {
+    if (!window.confirm('Are you sure you want to delete this task template?')) return;
+
+    try {
+      const token = localStorage.getItem('token');
+      await axios.delete(`http://localhost:5000/api/task-templates/${id}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      toast.success('Task template deleted');
+      fetchData();
+    } catch (error) {
+      toast.error('Failed to delete task template');
+      console.log(error)
+    }
+  };
+
   return (
-    
     <div className="min-h-screen bg-gray-50">
       <Navbar role="admin" userName={user?.fullName} />
 
@@ -94,41 +115,82 @@ const AdminDashboard = () => {
           </div>
         </div>
 
+        {/* Action Buttons */}
+        <div className="flex gap-4 mb-8">
+          <button
+            onClick={() => navigate('/admin/tasks/create-template')}
+            className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-3 rounded-lg transition flex items-center gap-2"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+            </svg>
+            Create New Task
+          </button>
+          <button
+            onClick={() => navigate('/admin/tasks/assign')}
+            className="bg-purple-600 hover:bg-purple-700 text-white font-semibold px-6 py-3 rounded-lg transition"
+          >
+            Assign Task
+          </button>
+        </div>
+
         {/* Task Management Section */}
-        <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
+        <div className="bg-white rounded-lg shadow-lg p-6 mb-8">
           <div className="flex justify-between items-center mb-6">
             <h2 className="text-2xl font-bold text-gray-900">Task Management</h2>
-            <button
-              onClick={() => navigate('/admin/tasks/create')}
-              className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-3 rounded-lg transition flex items-center gap-2"
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-              </svg>
-              Create New Task
-            </button>
           </div>
 
-          <div className="overflow-x-auto">
-            <table className="min-w-full">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Position</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Task Number</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Title</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Deadline</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                <tr>
-                  <td colSpan="5" className="px-6 py-8 text-center text-gray-500">
-                    No tasks created yet. Click "Create New Task" to get started.
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
+          {loading ? (
+            <div className="text-center text-gray-500 py-8">Loading...</div>
+          ) : taskTemplates.length === 0 ? (
+            <div className="text-center py-8 text-gray-500">
+              No tasks created yet. Click "Create New Task" to get started.
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="min-w-full">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Position</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Task Number</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Title</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Questions</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {taskTemplates.map((template) => (
+                    <tr key={template._id} className="hover:bg-gray-50">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">All Positions</td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className="px-3 py-1 bg-blue-100 text-blue-800 text-sm font-medium rounded-full">
+                          {template.taskNumber}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 text-sm text-gray-900">{template.title}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                        {template.questions.length} questions
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm space-x-2">
+                        <button
+                          onClick={() => navigate(`/admin/tasks/edit/${template._id}`)}
+                          className="text-blue-600 hover:text-blue-900 font-medium"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          onClick={() => handleDeleteTemplate(template._id)}
+                          className="text-red-600 hover:text-red-900 font-medium"
+                        >
+                          Delete
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
 
         {/* Recent Applicants */}
@@ -149,6 +211,7 @@ const AdminDashboard = () => {
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Position</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Applied</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Submitted Task</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
                   </tr>
                 </thead>
@@ -177,9 +240,21 @@ const AdminDashboard = () => {
                         {new Date(app.appliedAt).toLocaleDateString()}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm">
+                        {app.hasSubmittedTask ? (
+                          <button
+                            onClick={() => navigate(`/admin/submissions/user/${app.userId._id}`)}
+                            className="text-green-600 hover:text-green-900 font-medium"
+                          >
+                            View Submitted ({app.submittedTaskCount})
+                          </button>
+                        ) : (
+                          <span className="text-gray-400">-</span>
+                        )}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm">
                         <button
                           onClick={() => {
-                            navigate('/admin/tasks/create', { state: { application: app } });
+                            navigate('/admin/tasks/assign', { state: { application: app } });
                           }}
                           className="text-blue-600 hover:text-blue-900 font-medium"
                         >
@@ -195,7 +270,6 @@ const AdminDashboard = () => {
         </div>
       </div>
     </div>
-
   );
 };
 
