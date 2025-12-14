@@ -1,15 +1,18 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import axios from 'axios';
 import toast from 'react-hot-toast';
 import Navbar from '../Navbar';
 
 const JobApplication = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const user = JSON.parse(localStorage.getItem('user'));
+  const selectedJob = location.state?.job;
   
   const [formData, setFormData] = useState({
-    position: 'Machine Learning Engineer',
+    jobId: selectedJob?._id || '',
+    position: selectedJob?.title || '',
     coverMessage: '',
     skills: [''],
     education: [{
@@ -80,6 +83,12 @@ const JobApplication = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
+    if (!formData.jobId) {
+      toast.error('Job information is missing. Please select a job first.');
+      navigate('/student/jobs');
+      return;
+    }
+
     try {
       const token = localStorage.getItem('token');
       const cleanedData = {
@@ -105,6 +114,18 @@ const JobApplication = () => {
       <Navbar role="student" userName={user?.fullName} />
       
       <div className="max-w-4xl mx-auto p-6">
+        {/* Job Info Banner */}
+        {selectedJob && (
+          <div className="bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg shadow-lg p-6 mb-6 text-white">
+            <h2 className="text-2xl font-bold mb-2">Applying for: {selectedJob.title}</h2>
+            <div className="flex items-center gap-4 text-blue-100">
+              <span>📍 {selectedJob.location}</span>
+              <span>💼 {selectedJob.jobType}</span>
+              <span>🏢 {selectedJob.company}</span>
+            </div>
+          </div>
+        )}
+
         <div className="bg-white rounded-lg shadow-lg p-8">
           <h1 className="text-3xl font-bold text-gray-900 mb-8">Job Application Form</h1>
 
@@ -135,28 +156,23 @@ const JobApplication = () => {
               />
             </div>
 
-            {/* Position */}
+            {/* Position (Read-only) */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Position
               </label>
-              <select
+              <input
+                type="text"
                 value={formData.position}
-                onChange={(e) => setFormData({ ...formData, position: e.target.value })}
-                className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500"
-              >
-                <option>Machine Learning Engineer</option>
-                <option>Software Developer</option>
-                <option>Data Scientist</option>
-                <option>Full Stack Developer</option>
-                <option>Backend Developer</option>
-              </select>
+                disabled
+                className="w-full px-4 py-3 rounded-lg border border-gray-300 bg-gray-50"
+              />
             </div>
 
             {/* Skills */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Skills
+                Skills *
               </label>
               {formData.skills.map((skill, index) => (
                 <div key={index} className="flex gap-2 mb-2">
@@ -166,6 +182,7 @@ const JobApplication = () => {
                     onChange={(e) => updateSkill(index, e.target.value)}
                     className="flex-1 px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500"
                     placeholder="e.g., Python, Machine Learning, TensorFlow"
+                    required
                   />
                   {formData.skills.length > 1 && (
                     <button
@@ -190,7 +207,7 @@ const JobApplication = () => {
             {/* Education */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Education
+                Education *
               </label>
               {formData.education.map((edu, index) => (
                 <div key={index} className="p-4 border border-gray-200 rounded-lg mb-4">
@@ -318,12 +335,21 @@ const JobApplication = () => {
               />
             </div>
 
-            <button
-              type="submit"
-              className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-4 rounded-lg transition"
-            >
-              Submit Application
-            </button>
+            <div className="flex gap-4">
+              <button
+                type="submit"
+                className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-4 rounded-lg transition"
+              >
+                Submit Application
+              </button>
+              <button
+                type="button"
+                onClick={() => navigate('/student/jobs')}
+                className="px-6 py-4 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition"
+              >
+                Cancel
+              </button>
+            </div>
           </form>
         </div>
       </div>

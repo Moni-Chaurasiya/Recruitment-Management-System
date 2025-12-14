@@ -1,13 +1,27 @@
 import Application from '../models/Application.js';
-import User from '../models/User.js';
+import Job from '../models/Job.js';
 
-/****Submit Application***/
+// Submit Application (UPDATED - with jobId)
 export const submitApplication = async (req, res) => {
   try {
-    const { position, skills, education, experience, coverMessage } = req.body;
+    const { jobId, position, skills, education, experience, coverMessage } = req.body;
+
+    // Check if already applied
+    const existingApplication = await Application.findOne({
+      userId: req.userId,
+      jobId: jobId
+    });
+
+    if (existingApplication) {
+      return res.status(400).json({ message: 'You have already applied for this job' });
+    }
+
+    // Increment applicants count
+    await Job.findByIdAndUpdate(jobId, { $inc: { applicantsCount: 1 } });
 
     const application = new Application({
       userId: req.userId,
+      jobId,
       position,
       skills,
       education,
@@ -25,10 +39,11 @@ export const submitApplication = async (req, res) => {
   }
 };
 
-/****Get User Applications**/
+// Get User Applications (UPDATED - populate job details)
 export const getMyApplications = async (req, res) => {
   try {
     const applications = await Application.find({ userId: req.userId })
+      .populate('jobId', 'title company location jobType')
       .sort({ createdAt: -1 });
     res.json(applications);
   } catch (error) {
@@ -36,11 +51,12 @@ export const getMyApplications = async (req, res) => {
   }
 };
 
-/****Get All Applications (Admin)***/
+// Get All Applications (Admin) - UPDATED
 export const getAllApplications = async (req, res) => {
   try {
     const applications = await Application.find()
-      .populate('userId', 'fullName email')
+      .populate('userId', 'fullName email phone')
+      .populate('jobId', 'title company location')
       .sort({ createdAt: -1 });
     res.json(applications);
   } catch (error) {
@@ -48,7 +64,7 @@ export const getAllApplications = async (req, res) => {
   }
 };
 
-/****Get Application Stats (Admin)***/
+// Rest of the application controller methods remain the same
 export const getApplicationStats = async (req, res) => {
   try {
     const total = await Application.countDocuments();
@@ -61,11 +77,11 @@ export const getApplicationStats = async (req, res) => {
   }
 };
 
-/**Get Single Application by ID***/
 export const getApplicationById = async (req, res) => {
   try {
     const application = await Application.findById(req.params.id)
-      .populate('userId', 'fullName email');
+      .populate('userId', 'fullName email phone')
+      .populate('jobId', 'title company location');
     
     if (!application) {
       return res.status(404).json({ message: 'Application not found' });
@@ -77,7 +93,6 @@ export const getApplicationById = async (req, res) => {
   }
 };
 
-/****Update Application Status (Admin)****/
 export const updateApplicationStatus = async (req, res) => {
   try {
     const { status } = req.body;
@@ -100,7 +115,6 @@ export const updateApplicationStatus = async (req, res) => {
   }
 };
 
-// Delete Application
 export const deleteApplication = async (req, res) => {
   try {
     const application = await Application.findByIdAndDelete(req.params.id);
@@ -108,6 +122,9 @@ export const deleteApplication = async (req, res) => {
     if (!application) {
       return res.status(404).json({ message: 'Application not found' });
     }
+
+    // Decrement applicants count
+    await Job.findByIdAndUpdate(application.jobId, { $inc: { applicantsCount: -1 } });
 
     res.json({ message: 'Application deleted successfully' });
   } catch (error) {

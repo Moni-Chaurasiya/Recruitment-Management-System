@@ -1,17 +1,15 @@
 import TaskTemplate from '../models/TaskTemplate.js';
 
-// Create Task Template with Questions (Admin)
+// Create Task Template with Questions (Admin) - UPDATED
 export const createTaskTemplate = async (req, res) => {
   try {
-    const { taskNumber, title, description, instructions, questions } = req.body;
+    const { taskNumber, title, description, instructions, questions, timeLimit } = req.body;
 
-    // Check if task number already exists
     const existingTask = await TaskTemplate.findOne({ taskNumber });
     if (existingTask) {
       return res.status(400).json({ message: 'Task number already exists' });
     }
 
-    // Calculate total points
     const totalPoints = questions.reduce((sum, q) => sum + (q.points || 1), 0);
 
     const taskTemplate = new TaskTemplate({
@@ -21,6 +19,7 @@ export const createTaskTemplate = async (req, res) => {
       instructions,
       questions,
       totalPoints,
+      timeLimit: timeLimit || 60, // Default 60 minutes
       createdBy: req.userId
     });
 
@@ -34,7 +33,7 @@ export const createTaskTemplate = async (req, res) => {
   }
 };
 
-// Get All Task Templates (Admin)
+// Rest remain same
 export const getAllTaskTemplates = async (req, res) => {
   try {
     const templates = await TaskTemplate.find()
@@ -46,7 +45,6 @@ export const getAllTaskTemplates = async (req, res) => {
   }
 };
 
-// Get Task Template by ID
 export const getTaskTemplateById = async (req, res) => {
   try {
     const template = await TaskTemplate.findById(req.params.id);
@@ -59,7 +57,6 @@ export const getTaskTemplateById = async (req, res) => {
   }
 };
 
-// Get Task Template by Task Number
 export const getTaskTemplateByNumber = async (req, res) => {
   try {
     const template = await TaskTemplate.findOne({ taskNumber: req.params.taskNumber });
@@ -72,22 +69,19 @@ export const getTaskTemplateByNumber = async (req, res) => {
   }
 };
 
-// Get All Task Numbers (for dropdown)
 export const getAllTaskNumbers = async (req, res) => {
   try {
-    const templates = await TaskTemplate.find().select('taskNumber title');
+    const templates = await TaskTemplate.find().select('taskNumber title timeLimit');
     res.json(templates);
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 };
 
-// Update Task Template (Admin)
 export const updateTaskTemplate = async (req, res) => {
   try {
     const updates = req.body;
     
-    // Recalculate total points if questions are updated
     if (updates.questions) {
       updates.totalPoints = updates.questions.reduce((sum, q) => sum + (q.points || 1), 0);
     }
@@ -108,7 +102,6 @@ export const updateTaskTemplate = async (req, res) => {
   }
 };
 
-// Delete Task Template (Admin)
 export const deleteTaskTemplate = async (req, res) => {
   try {
     const template = await TaskTemplate.findByIdAndDelete(req.params.id);

@@ -1,4 +1,3 @@
-// ============= src/components/Admin/CreateTaskTemplate.jsx (NEW FILE) =============
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
@@ -14,6 +13,7 @@ const CreateTaskTemplate = () => {
     title: '',
     description: '',
     instructions: '',
+    timeLimit: 60, // NEW - default 60 minutes
     questions: [{
       questionText: '',
       questionType: 'mcq',
@@ -45,13 +45,10 @@ const CreateTaskTemplate = () => {
     const newQuestions = [...formData.questions];
     newQuestions[index][field] = value;
     
-    // If changing to text type, clear MCQ specific fields
     if (field === 'questionType' && value === 'text') {
       newQuestions[index].options = [];
       newQuestions[index].correctAnswer = '';
-    }
-    // If changing to MCQ, add default options
-    else if (field === 'questionType' && value === 'mcq') {
+    } else if (field === 'questionType' && value === 'mcq') {
       newQuestions[index].options = ['', '', '', ''];
       newQuestions[index].correctAnswer = '';
     }
@@ -106,7 +103,7 @@ const CreateTaskTemplate = () => {
           <h1 className="text-3xl font-bold text-gray-900 mb-8">Create Task Template</h1>
 
           <form onSubmit={handleSubmit} className="space-y-8">
-            {/* Task Number */}
+            {/* Task Number & Title */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -132,9 +129,28 @@ const CreateTaskTemplate = () => {
                   value={formData.title}
                   onChange={(e) => setFormData({ ...formData, title: e.target.value })}
                   className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-purple-500"
-                  placeholder="e.g., Machine Learning Assessment"
+                  placeholder="e.g., JavaScript Fundamentals"
                 />
               </div>
+            </div>
+
+            {/* Time Limit - NEW */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Time Limit (minutes) *
+              </label>
+              <input
+                type="number"
+                required
+                min="15"
+                max="180"
+                value={formData.timeLimit}
+                onChange={(e) => setFormData({ ...formData, timeLimit: parseInt(e.target.value) })}
+                className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-purple-500"
+              />
+              <p className="text-sm text-gray-500 mt-1">
+                ⏱️ Students will have <strong>{formData.timeLimit} minutes</strong> to complete this assessment once they start. The test will auto-submit when time expires.
+              </p>
             </div>
 
             {/* Description */}
@@ -250,7 +266,9 @@ const CreateTaskTemplate = () => {
                       </label>
                       {question.options.map((option, oIndex) => (
                         <div key={oIndex} className="flex gap-2 items-center">
-                          <span className="text-gray-600 font-medium">{String.fromCharCode(65 + oIndex)}.</span>
+                          <span className="text-gray-600 font-medium min-w-[30px]">
+                            {String.fromCharCode(65 + oIndex)}.
+                          </span>
                           <input
                             type="text"
                             value={option}
@@ -281,6 +299,14 @@ const CreateTaskTemplate = () => {
                           )}
                         </select>
                       </div>
+                    </div>
+                  )}
+
+                  {question.questionType === 'text' && (
+                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                      <p className="text-sm text-blue-800">
+                        💡 This is a text answer question. Students will type their answer, and you can manually grade it later.
+                      </p>
                     </div>
                   )}
                 </div>

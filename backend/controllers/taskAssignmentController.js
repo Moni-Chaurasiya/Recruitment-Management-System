@@ -2,7 +2,7 @@ import TaskAssignment from '../models/TaskAssignment.js';
 import TaskTemplate from '../models/TaskTemplate.js';
 import Application from '../models/Application.js';
 
-// Assign Task to Student (Admin)
+// Assign Task to Student (Admin) - UPDATED
 export const assignTask = async (req, res) => {
   try {
     const { applicationId, userId, taskNumber, deadline } = req.body;
@@ -25,7 +25,8 @@ export const assignTask = async (req, res) => {
       userId,
       taskNumber,
       taskTemplateId: taskTemplate._id,
-      deadline
+      deadline,
+      timeLimit: taskTemplate.timeLimit // Get time limit from template
     });
 
     await assignment.save();
@@ -65,20 +66,61 @@ export const getAllAssignments = async (req, res) => {
   }
 };
 
-// Start Task (Student)
+// Start Task (Student) - UPDATED with expiry time
 export const startTask = async (req, res) => {
   try {
-    const assignment = await TaskAssignment.findByIdAndUpdate(
-      req.params.id,
-      { status: 'In Progress', startedAt: new Date() },
-      { new: true }
-    ).populate('taskTemplateId');
+    const assignment = await TaskAssignment.findById(req.params.id)
+      .populate('taskTemplateId');
 
     if (!assignment) {
       return res.status(404).json({ message: 'Assignment not found' });
     }
 
-    res.json({ message: 'Task started', assignment });
+    // Check if deadline to start has passed
+    const deadlineDate = new Date(assignment.assignedAt.getTime() + assignment.deadline * 60 * 60 * 1000);
+    if (new Date() > deadlineDate) {
+      assignment.status = 'Expired';
+      await assignment.save();
+      return res.status(400).json({ message: 'Deadline to start this test has passed' });
+    }
+
+    // Set expiry time based on time limit
+    const startedAt = new Date();
+    const expiresAt = new Date(startedAt.getTime() + assignment.timeLimit * 60 * 1000);
+
+    assignment.status = 'In Progress';
+    assignment.startedAt = startedAt;
+    assignment.expiresAt = expiresAt;
+    await assignment.save();
+
+    res.json({ 
+      message: 'Task started', 
+      assignment,
+      expiresAt 
+    });
+  } catch (error) {
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
+// Check if task expired (called from frontend)
+export const checkTaskExpiry = async (req, res) => {
+  try {
+    const assignment = await TaskAssignment.findById(req.params.id);
+
+    if (!assignment) {
+      return res.status(404).json({ message: 'Assignment not found' });
+    }
+
+    if (assignment.expiresAt && new Date() > assignment.expiresAt) {
+      if (assignment.status === 'In Progress') {
+        assignment.status = 'Expired';
+        await assignment.save();
+        return res.json({ expired: true, message: 'Test time has expired' });
+      }
+    }
+
+    res.json({ expired: false, expiresAt: assignment.expiresAt });
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });
   }
